@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>パチンコ期待値計算ツール</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      color: #f0c040;
+      margin-bottom: 24px;
+      letter-spacing: 0.05em;
+    }
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a4a;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 1rem;
+      color: #a0a0c0;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #2a2a4a;
+      padding-bottom: 8px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    label {
+      font-size: 0.82rem;
+      color: #8080a0;
+    }
+    input {
+      background: #0f0f1a;
+      border: 1px solid #3a3a5a;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      padding: 10px 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #f0c040; }
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .prob-row span {
+      color: #8080a0;
+      font-size: 1.1rem;
+    }
+    .prob-row input { flex: 1; }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #f0c040, #e08000);
+      border: none;
+      border-radius: 10px;
+      color: #0f0f1a;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    .results { display: none; }
+    .results.show { display: block; }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .result-item {
+      background: #0f0f1a;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .result-item .label {
+      font-size: 0.78rem;
+      color: #7070a0;
+      margin-bottom: 6px;
+    }
+    .result-item .value {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .positive { color: #40e080; }
+    .negative { color: #e04040; }
+    .neutral  { color: #f0c040; }
+    .full-width { grid-column: 1 / -1; }
+    .meter-bar {
+      height: 12px;
+      background: #0f0f1a;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .meter-fill {
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.4s ease;
+    }
+    .comment {
+      font-size: 0.88rem;
+      color: #c0c0d0;
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #0f0f1a;
+      border-radius: 8px;
+      border-left: 3px solid #f0c040;
+      line-height: 1.6;
+    }
+    .reset-btn {
+      background: #2a2a4a;
+      color: #a0a0c0;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .reset-btn:hover { background: #3a3a5a; opacity: 1; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎰 パチンコ期待値計算ツール</h1>
+
+    <div class="card">
+      <h2>台スペック</h2>
+      <div class="grid">
+        <div class="field">
+          <label>大当たり確率（分母）</label>
+          <div class="prob-row">
+            <span>1 /</span>
+            <input type="number" id="prob" placeholder="例: 319" min="1">
+          </div>
+        </div>
+        <div class="field">
+          <label>平均出玉（玉/大当たり）</label>
+          <input type="number" id="balls" placeholder="例: 1500" min="0">
+        </div>
+        <div class="field">
+          <label>ベース（%）</label>
+          <input type="number" id="base" placeholder="例: 60" min="0" max="100">
+        </div>
+        <div class="field">
+          <label>玉単価（円）</label>
+          <input type="number" id="price" value="4" min="1" max="10">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>実戦データ</h2>
+      <div class="grid">
+        <div class="field">
+          <label>総回転数（回）</label>
+          <input type="number" id="spins" placeholder="例: 500" min="0">
+        </div>
+        <div class="field">
+          <label>投資金額（円）</label>
+          <input type="number" id="invest" placeholder="例: 10000" min="0">
+        </div>
+        <div class="field">
+          <label>大当たり回数</label>
+          <input type="number" id="hits" placeholder="例: 3" min="0">
+        </div>
+        <div class="field">
+          <label>獲得出玉合計（玉）</label>
+          <input type="number" id="totalBalls" placeholder="例: 5000" min="0">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="calculate()">期待値を計算する</button>
+
+    <div class="card results" id="results">
+      <h2>計算結果</h2>
+      <div class="result-grid" id="resultGrid"></div>
+      <div class="comment" id="comment"></div>
+      <button class="reset-btn" onclick="resetResults()">リセット</button>
+    </div>
+  </div>
+
+  <script>
+    function calculate() {
+      const prob      = parseFloat(document.getElementById('prob').value);
+      const balls     = parseFloat(document.getElementById('balls').value);
+      const base      = parseFloat(document.getElementById('base').value);
+      const price     = parseFloat(document.getElementById('price').value) || 4;
+      const spins     = parseFloat(document.getElementById('spins').value);
+      const invest    = parseFloat(document.getElementById('invest').value);
+      const hits      = parseFloat(document.getElementById('hits').value);
+      const totalBalls= parseFloat(document.getElementById('totalBalls').value);
+
+      if (!prob || !balls || base === '' || isNaN(base)) {
+        alert('台スペック（大当たり確率・出玉・ベース）を入力してください');
+        return;
+      }
+
+      // 1回転コスト(円): 打ち出し4玉×玉単価×(1-ベース/100)
+      const costPerSpin = 4 * price * (1 - base / 100);
+
+      // 理論期待値(1回転)
+      const evPerSpin = (1 / prob) * balls * price - costPerSpin;
+
+      // ボーダーライン: 期待値0になる回転数/千円
+      const borderPer1000 = 1000 / (4 * price * (1 - base / 100));
+      const borderLine    = borderPer1000;            // 千円あたり何回転必要か
+      const borderActual  = spins && invest ? (spins / (invest / 1000)) : null;
+
+      // 回収率 (理論)
+      const theoreticalReturn = (balls * price * (1 / prob)) / (costPerSpin * prob > 0 ? 1 : 1);
+      const returnRate = ((balls * price) / (prob * costPerSpin * prob)) * 100;
+      // 簡易: 収支期待 / コスト
+      const evRate = ((1/prob * balls * price) / (costPerSpin * prob === 0 ? 1 : (1/prob * costPerSpin))) * 100;
+      // 正しい回収率: 1大当たり分の回収 / 1大当たり分のコスト
+      const costPerJackpot = prob * costPerSpin; // prob = 当たるまでの回転数
+      const recoverRate = (balls * price) / (prob * costPerSpin) * 100;
+
+      // 実戦収支
+      let actualBalance = null, actualHitRate = null, actualReturnRate = null;
+      if (!isNaN(spins) && !isNaN(invest) && !isNaN(hits) && !isNaN(totalBalls)) {
+        actualBalance   = totalBalls * price - invest;
+        actualHitRate   = spins / hits;
+        actualReturnRate= (totalBalls * price) / invest * 100;
+      }
+
+      const items = [];
+
+      // スペック結果
+      items.push({ label: '1回転あたり期待値', value: `${evPerSpin >= 0 ? '+' : ''}${evPerSpin.toFixed(2)}円`, cls: evPerSpin >= 0 ? 'positive' : 'negative' });
+      items.push({ label: '1回転コスト', value: `${costPerSpin.toFixed(2)}円`, cls: 'neutral' });
+      items.push({ label: 'ボーダーライン', value: `${borderLine.toFixed(1)}回転/千円`, cls: 'neutral' });
+      items.push({ label: '理論回収率', value: `${recoverRate.toFixed(1)}%`, cls: recoverRate >= 100 ? 'positive' : 'negative' });
+
+      if (actualBalance !== null) {
+        items.push({ label: '実際の収支', value: `${actualBalance >= 0 ? '+' : ''}${actualBalance.toLocaleString()}円`, cls: actualBalance >= 0 ? 'positive' : 'negative' });
+        items.push({ label: '実際の当たり間隔', value: `${actualHitRate.toFixed(0)}回転/回`, cls: 'neutral' });
+        items.push({ label: '実際の回収率', value: `${actualReturnRate.toFixed(1)}%`, cls: actualReturnRate >= 100 ? 'positive' : 'negative' });
+        const theoreticalHitRate = prob;
+        const diff = actualHitRate - theoreticalHitRate;
+        items.push({ label: '理論との当たり間隔差', value: `${diff >= 0 ? '+' : ''}${diff.toFixed(0)}回転`, cls: diff <= 0 ? 'positive' : 'negative' });
+      }
+
+      // ボーダーvs実戦
+      if (borderActual !== null) {
+        items.push({
+          label: '実戦回転率（千円あたり）',
+          value: `${borderActual.toFixed(1)}回転`,
+          cls: borderActual >= borderLine ? 'positive' : 'negative',
+          full: false
+        });
+      }
+
+      const grid = document.getElementById('resultGrid');
+      grid.innerHTML = items.map(it =>
+        `<div class="result-item${it.full ? ' full-width' : ''}">
+          <div class="label">${it.label}</div>
+          <div class="value ${it.cls}">${it.value}</div>
+        </div>`
+      ).join('');
+
+      // コメント
+      let comment = `📊 <strong>台スペック評価</strong><br>`;
+      comment += `大当たり確率 1/${prob}、平均出玉 ${balls}玉、ベース ${base}% の台です。<br>`;
+      comment += `1回転あたりの期待値は <strong>${evPerSpin.toFixed(2)}円</strong>。`;
+      if (evPerSpin > 0) {
+        comment += `<br>✅ この台は理論上プラス期待値です（ボーダー ${borderLine.toFixed(1)}回転/千円 を上回ること）。`;
+      } else {
+        comment += `<br>⚠️ この台は理論上マイナス期待値です。ボーダーは ${borderLine.toFixed(1)}回転/千円 以上が必要です。`;
+      }
+      if (actualBalance !== null) {
+        comment += `<br><br>🎯 <strong>実戦結果</strong><br>`;
+        comment += `収支: ${actualBalance >= 0 ? '+' : ''}${actualBalance.toLocaleString()}円（回収率 ${actualReturnRate.toFixed(1)}%）`;
+        if (actualBalance >= 0) {
+          comment += '<br>✅ 今回はプラス収支でした。';
+        } else {
+          comment += '<br>📉 今回はマイナス収支でした。';
+        }
+      }
+
+      document.getElementById('comment').innerHTML = comment;
+      document.getElementById('results').classList.add('show');
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function resetResults() {
+      document.getElementById('results').classList.remove('show');
+    }
+  </script>
+</body>
+</html>
