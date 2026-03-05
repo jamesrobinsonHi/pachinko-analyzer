@@ -71,12 +71,63 @@
       align-items: center;
       gap: 8px;
     }
-    .prob-row span {
-      color: #8080a0;
-      font-size: 1.1rem;
-    }
+    .prob-row span { color: #8080a0; font-size: 1.1rem; }
     .prob-row input { flex: 1; }
-    button {
+
+    /* 機種検索 */
+    .search-row {
+      display: flex;
+      gap: 10px;
+    }
+    .search-row input { flex: 1; }
+    .btn-search {
+      padding: 10px 16px;
+      background: #2a2a5a;
+      border: 1px solid #4a4a8a;
+      border-radius: 8px;
+      color: #a0a0f0;
+      font-size: 0.9rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+    .btn-search:hover { background: #3a3a7a; }
+    .search-results {
+      display: none;
+      background: #0f0f1a;
+      border: 1px solid #3a3a5a;
+      border-radius: 8px;
+      margin-top: 8px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .search-results.show { display: block; }
+    .search-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #1a1a2e;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: #1a1a3a; }
+    .search-status {
+      font-size: 0.82rem;
+      color: #7070a0;
+      margin-top: 6px;
+      min-height: 18px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      background: #f0c04030;
+      color: #f0c040;
+      border-radius: 4px;
+      padding: 2px 6px;
+      margin-left: 8px;
+    }
+
+    button.calc-btn {
       width: 100%;
       padding: 14px;
       background: linear-gradient(135deg, #f0c040, #e08000);
@@ -88,7 +139,8 @@
       cursor: pointer;
       transition: opacity 0.2s;
     }
-    button:hover { opacity: 0.85; }
+    button.calc-btn:hover { opacity: 0.85; }
+
     .results { display: none; }
     .results.show { display: block; }
     .result-grid {
@@ -102,31 +154,16 @@
       padding: 14px;
       text-align: center;
     }
-    .result-item .label {
+    .result-item .rlabel {
       font-size: 0.78rem;
       color: #7070a0;
       margin-bottom: 6px;
     }
-    .result-item .value {
-      font-size: 1.3rem;
-      font-weight: 700;
-    }
+    .result-item .value { font-size: 1.3rem; font-weight: 700; }
     .positive { color: #40e080; }
     .negative { color: #e04040; }
     .neutral  { color: #f0c040; }
     .full-width { grid-column: 1 / -1; }
-    .meter-bar {
-      height: 12px;
-      background: #0f0f1a;
-      border-radius: 6px;
-      overflow: hidden;
-      margin-top: 10px;
-    }
-    .meter-fill {
-      height: 100%;
-      border-radius: 6px;
-      transition: width 0.4s ease;
-    }
     .comment {
       font-size: 0.88rem;
       color: #c0c0d0;
@@ -138,21 +175,43 @@
       line-height: 1.6;
     }
     .reset-btn {
+      width: 100%;
+      padding: 10px;
       background: #2a2a4a;
       color: #a0a0c0;
       font-size: 0.9rem;
       font-weight: 500;
+      margin-top: 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .reset-btn:hover { background: #3a3a5a; }
+    .source-tag {
+      font-size: 0.75rem;
+      color: #5050a0;
       margin-top: 4px;
     }
-    .reset-btn:hover { background: #3a3a5a; opacity: 1; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎰 パチンコ期待値計算ツール</h1>
 
+    <!-- 機種検索 -->
     <div class="card">
-      <h2>台スペック</h2>
+      <h2>機種検索 <span style="font-size:0.75rem;color:#5070a0;">P-WORLD連携</span></h2>
+      <div class="search-row">
+        <input type="text" id="searchInput" placeholder="機種名を入力（例: 海物語、エヴァ…）" onkeydown="if(event.key==='Enter')searchMachine()">
+        <button class="btn-search" onclick="searchMachine()">検索</button>
+      </div>
+      <div class="search-status" id="searchStatus"></div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <!-- 台スペック -->
+    <div class="card">
+      <h2>台スペック <span class="source-tag" id="specSource"></span></h2>
       <div class="grid">
         <div class="field">
           <label>大当たり確率（分母）</label>
@@ -176,6 +235,7 @@
       </div>
     </div>
 
+    <!-- 実戦データ -->
     <div class="card">
       <h2>実戦データ</h2>
       <div class="grid">
@@ -198,8 +258,9 @@
       </div>
     </div>
 
-    <button onclick="calculate()">期待値を計算する</button>
+    <button class="calc-btn" onclick="calculate()">期待値を計算する</button>
 
+    <!-- 結果 -->
     <div class="card results" id="results">
       <h2>計算結果</h2>
       <div class="result-grid" id="resultGrid"></div>
@@ -209,101 +270,120 @@
   </div>
 
   <script>
+    // ---- 機種検索 ----
+    async function searchMachine() {
+      const q = document.getElementById('searchInput').value.trim();
+      if (!q) return;
+      const status = document.getElementById('searchStatus');
+      const resultsDiv = document.getElementById('searchResults');
+      status.textContent = '検索中...';
+      resultsDiv.classList.remove('show');
+      resultsDiv.innerHTML = '';
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        if (data.error) { status.textContent = data.error; return; }
+        if (!data.results || data.results.length === 0) {
+          status.textContent = '該当機種が見つかりませんでした';
+          return;
+        }
+        status.textContent = `${data.results.length}件ヒット`;
+        resultsDiv.innerHTML = data.results.map(m =>
+          `<div class="search-item" onclick="loadSpec('${m.id}', '${m.name.replace(/'/g,"\\'")}')">
+            ${m.name}
+            <span class="badge">スペック取得</span>
+          </div>`
+        ).join('');
+        resultsDiv.classList.add('show');
+      } catch(e) {
+        status.textContent = 'サーバーに接続できません（server.py を起動してください）';
+      }
+    }
+
+    async function loadSpec(id, name) {
+      const status = document.getElementById('searchStatus');
+      status.textContent = `${name} のスペックを取得中...`;
+      document.getElementById('searchResults').classList.remove('show');
+      try {
+        const res = await fetch(`/api/spec/${id}`);
+        const data = await res.json();
+        if (data.error) { status.textContent = 'スペック取得失敗: ' + data.error; return; }
+        if (data.prob)  document.getElementById('prob').value  = data.prob;
+        if (data.balls) document.getElementById('balls').value = data.balls;
+        document.getElementById('specSource').textContent = `出典: P-WORLD「${data.name || name}」`;
+        status.textContent = `✅ ${data.name || name} のスペックを自動入力しました`;
+        document.getElementById('searchInput').value = data.name || name;
+      } catch(e) {
+        status.textContent = 'スペック取得に失敗しました';
+      }
+    }
+
+    // ---- 期待値計算 ----
     function calculate() {
-      const prob      = parseFloat(document.getElementById('prob').value);
-      const balls     = parseFloat(document.getElementById('balls').value);
-      const base      = parseFloat(document.getElementById('base').value);
-      const price     = parseFloat(document.getElementById('price').value) || 4;
-      const spins     = parseFloat(document.getElementById('spins').value);
-      const invest    = parseFloat(document.getElementById('invest').value);
-      const hits      = parseFloat(document.getElementById('hits').value);
-      const totalBalls= parseFloat(document.getElementById('totalBalls').value);
+      const prob       = parseFloat(document.getElementById('prob').value);
+      const balls      = parseFloat(document.getElementById('balls').value);
+      const base       = parseFloat(document.getElementById('base').value);
+      const price      = parseFloat(document.getElementById('price').value) || 4;
+      const spins      = parseFloat(document.getElementById('spins').value);
+      const invest     = parseFloat(document.getElementById('invest').value);
+      const hits       = parseFloat(document.getElementById('hits').value);
+      const totalBalls = parseFloat(document.getElementById('totalBalls').value);
 
       if (!prob || !balls || base === '' || isNaN(base)) {
         alert('台スペック（大当たり確率・出玉・ベース）を入力してください');
         return;
       }
 
-      // 1回転コスト(円): 打ち出し4玉×玉単価×(1-ベース/100)
-      const costPerSpin = 4 * price * (1 - base / 100);
+      const costPerSpin   = 4 * price * (1 - base / 100);
+      const evPerSpin     = (1 / prob) * balls * price - costPerSpin;
+      const borderLine    = 1000 / (4 * price * (1 - base / 100));
+      const recoverRate   = (balls * price) / (prob * costPerSpin) * 100;
+      const borderActual  = (!isNaN(spins) && !isNaN(invest) && invest > 0)
+                            ? spins / (invest / 1000) : null;
 
-      // 理論期待値(1回転)
-      const evPerSpin = (1 / prob) * balls * price - costPerSpin;
-
-      // ボーダーライン: 期待値0になる回転数/千円
-      const borderPer1000 = 1000 / (4 * price * (1 - base / 100));
-      const borderLine    = borderPer1000;            // 千円あたり何回転必要か
-      const borderActual  = spins && invest ? (spins / (invest / 1000)) : null;
-
-      // 回収率 (理論)
-      const theoreticalReturn = (balls * price * (1 / prob)) / (costPerSpin * prob > 0 ? 1 : 1);
-      const returnRate = ((balls * price) / (prob * costPerSpin * prob)) * 100;
-      // 簡易: 収支期待 / コスト
-      const evRate = ((1/prob * balls * price) / (costPerSpin * prob === 0 ? 1 : (1/prob * costPerSpin))) * 100;
-      // 正しい回収率: 1大当たり分の回収 / 1大当たり分のコスト
-      const costPerJackpot = prob * costPerSpin; // prob = 当たるまでの回転数
-      const recoverRate = (balls * price) / (prob * costPerSpin) * 100;
-
-      // 実戦収支
       let actualBalance = null, actualHitRate = null, actualReturnRate = null;
-      if (!isNaN(spins) && !isNaN(invest) && !isNaN(hits) && !isNaN(totalBalls)) {
-        actualBalance   = totalBalls * price - invest;
-        actualHitRate   = spins / hits;
-        actualReturnRate= (totalBalls * price) / invest * 100;
+      if (!isNaN(spins) && !isNaN(invest) && !isNaN(hits) && hits > 0 && !isNaN(totalBalls)) {
+        actualBalance    = totalBalls * price - invest;
+        actualHitRate    = spins / hits;
+        actualReturnRate = (totalBalls * price) / invest * 100;
       }
 
-      const items = [];
+      const items = [
+        { label:'1回転あたり期待値',  value:`${evPerSpin>=0?'+':''}${evPerSpin.toFixed(2)}円`, cls: evPerSpin>=0?'positive':'negative' },
+        { label:'1回転コスト',         value:`${costPerSpin.toFixed(2)}円`,                   cls:'neutral' },
+        { label:'ボーダーライン',       value:`${borderLine.toFixed(1)}回転/千円`,             cls:'neutral' },
+        { label:'理論回収率',           value:`${recoverRate.toFixed(1)}%`,                    cls: recoverRate>=100?'positive':'negative' },
+      ];
 
-      // スペック結果
-      items.push({ label: '1回転あたり期待値', value: `${evPerSpin >= 0 ? '+' : ''}${evPerSpin.toFixed(2)}円`, cls: evPerSpin >= 0 ? 'positive' : 'negative' });
-      items.push({ label: '1回転コスト', value: `${costPerSpin.toFixed(2)}円`, cls: 'neutral' });
-      items.push({ label: 'ボーダーライン', value: `${borderLine.toFixed(1)}回転/千円`, cls: 'neutral' });
-      items.push({ label: '理論回収率', value: `${recoverRate.toFixed(1)}%`, cls: recoverRate >= 100 ? 'positive' : 'negative' });
-
-      if (actualBalance !== null) {
-        items.push({ label: '実際の収支', value: `${actualBalance >= 0 ? '+' : ''}${actualBalance.toLocaleString()}円`, cls: actualBalance >= 0 ? 'positive' : 'negative' });
-        items.push({ label: '実際の当たり間隔', value: `${actualHitRate.toFixed(0)}回転/回`, cls: 'neutral' });
-        items.push({ label: '実際の回収率', value: `${actualReturnRate.toFixed(1)}%`, cls: actualReturnRate >= 100 ? 'positive' : 'negative' });
-        const theoreticalHitRate = prob;
-        const diff = actualHitRate - theoreticalHitRate;
-        items.push({ label: '理論との当たり間隔差', value: `${diff >= 0 ? '+' : ''}${diff.toFixed(0)}回転`, cls: diff <= 0 ? 'positive' : 'negative' });
-      }
-
-      // ボーダーvs実戦
       if (borderActual !== null) {
-        items.push({
-          label: '実戦回転率（千円あたり）',
-          value: `${borderActual.toFixed(1)}回転`,
-          cls: borderActual >= borderLine ? 'positive' : 'negative',
-          full: false
-        });
+        items.push({ label:'実戦回転率（千円）', value:`${borderActual.toFixed(1)}回転`, cls: borderActual>=borderLine?'positive':'negative' });
+      }
+      if (actualBalance !== null) {
+        items.push({ label:'実際の収支',           value:`${actualBalance>=0?'+':''}${actualBalance.toLocaleString()}円`,   cls: actualBalance>=0?'positive':'negative' });
+        items.push({ label:'実際の当たり間隔',      value:`${actualHitRate.toFixed(0)}回転/回`,                             cls:'neutral' });
+        items.push({ label:'実際の回収率',           value:`${actualReturnRate.toFixed(1)}%`,                               cls: actualReturnRate>=100?'positive':'negative' });
+        const diff = actualHitRate - prob;
+        items.push({ label:'理論との当たり間隔差', value:`${diff>=0?'+':''}${diff.toFixed(0)}回転`, cls: diff<=0?'positive':'negative' });
       }
 
-      const grid = document.getElementById('resultGrid');
-      grid.innerHTML = items.map(it =>
-        `<div class="result-item${it.full ? ' full-width' : ''}">
-          <div class="label">${it.label}</div>
+      document.getElementById('resultGrid').innerHTML = items.map(it =>
+        `<div class="result-item">
+          <div class="rlabel">${it.label}</div>
           <div class="value ${it.cls}">${it.value}</div>
         </div>`
       ).join('');
 
-      // コメント
       let comment = `📊 <strong>台スペック評価</strong><br>`;
-      comment += `大当たり確率 1/${prob}、平均出玉 ${balls}玉、ベース ${base}% の台です。<br>`;
+      comment += `大当たり確率 1/${prob}、平均出玉 ${balls}玉、ベース ${base}%。<br>`;
       comment += `1回転あたりの期待値は <strong>${evPerSpin.toFixed(2)}円</strong>。`;
       if (evPerSpin > 0) {
-        comment += `<br>✅ この台は理論上プラス期待値です（ボーダー ${borderLine.toFixed(1)}回転/千円 を上回ること）。`;
+        comment += `<br>✅ この台はプラス期待値です（ボーダー ${borderLine.toFixed(1)}回転/千円 を上回ること）。`;
       } else {
-        comment += `<br>⚠️ この台は理論上マイナス期待値です。ボーダーは ${borderLine.toFixed(1)}回転/千円 以上が必要です。`;
+        comment += `<br>⚠️ マイナス期待値。ボーダー ${borderLine.toFixed(1)}回転/千円 以上が必要です。`;
       }
       if (actualBalance !== null) {
-        comment += `<br><br>🎯 <strong>実戦結果</strong><br>`;
-        comment += `収支: ${actualBalance >= 0 ? '+' : ''}${actualBalance.toLocaleString()}円（回収率 ${actualReturnRate.toFixed(1)}%）`;
-        if (actualBalance >= 0) {
-          comment += '<br>✅ 今回はプラス収支でした。';
-        } else {
-          comment += '<br>📉 今回はマイナス収支でした。';
-        }
+        comment += `<br><br>🎯 <strong>実戦結果</strong>: 収支 ${actualBalance>=0?'+':''}${actualBalance.toLocaleString()}円（回収率 ${actualReturnRate.toFixed(1)}%）`;
+        comment += actualBalance >= 0 ? '<br>✅ プラス収支でした。' : '<br>📉 マイナス収支でした。';
       }
 
       document.getElementById('comment').innerHTML = comment;
